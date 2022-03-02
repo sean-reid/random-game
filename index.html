@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html>
+<body>
+
+<h1>Random Number Game Solver</h1>
+<h2>Whoever guesses the closest number to the random number wins</h2>
+
+<p>Enter the min and max number and click GO.</p>
+<p>After each player begins guessing, enter their guesses and click GO for the optimal next guess.</p>
+
+<strong>Min Number</strong><br>
+<input type="text" name="minNumber" id="minNumber" size="15" maxlength="5" />
+<br><br>
+
+<strong>Max Number</strong><br>
+<input type="text" name="maxNumber" id="maxNumber" size="15" maxlength="5" />
+<br><br>
+
+<strong>Latest Guess</strong><br><input type="text" name="latestGuess" id="latestGuess" size="15" maxlength="5" />
+<br><br>
+
+<button id="button">GO</button>
+
+<script src="index.js"></script>
+<br><br>
+
+<strong>You Should Guess: </strong><p id="guess"></p>
+
+</body>
+</html>
