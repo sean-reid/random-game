@@ -22,12 +22,11 @@ describe("copy", () => {
 
   it("describes the mix and where it came from", () => {
     const mix = { middle: 0.5, anywhere: 0.35, hugger: 0.15 };
-    expect(mixText(mix, 0)).toContain(
-      "50% go for the middle of the biggest gap, 35% anywhere, 15% hug",
+    expect(mixText(mix, 0)).toBe(
+      "Later players: 50% go for the middle of the biggest gap, 35% anywhere, 15% hug a neighbour, a starting guess until you reveal rounds.",
     );
-    expect(mixText(mix, 0)).toContain("starting guess");
-    expect(mixText(mix, 1)).toContain("Learned from 1 guess at your table");
-    expect(mixText(mix, 12)).toContain("Learned from 12 guesses at your table");
+    expect(mixText(mix, 1)).toContain("learned from 1 guess here");
+    expect(mixText(mix, 12)).toContain("learned from 12 guesses here");
   });
 
   it("names the winner, a spot-on guess, a tie, and nobody", () => {

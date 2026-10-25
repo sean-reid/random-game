@@ -69,12 +69,8 @@ app.innerHTML = `
   <details id="board">
     <summary>Scoreboard</summary>
     <table id="tally"></table>
+    <p id="mix" class="soft"></p>
     <button id="reset" type="button">Clear scoreboard and what it learned</button>
-  </details>
-  <details>
-    <summary>How this works</summary>
-    <p>Every guess owns the numbers it is closest to, and the secret number is taken to be anywhere in the range with equal chance. The grey curve is the share of the range you would end up with from each spot once the players still to come have guessed, averaged over up to a few hundred plays of the rest of the round. The darker band underneath is a bad round: one play in ten does worse than that. The marker is the top of the curve.</p>
-    <p id="mix"></p>
   </details>
   <footer><a href="https://github.com/sean-reid/random-game">Source</a> · <a href="https://sean-reid.github.io/blog/random-game.html">Why this works</a></footer>
 `;

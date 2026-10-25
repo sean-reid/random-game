@@ -14,11 +14,12 @@ export function oddsText(after: number, p: number, low: number): string {
 }
 
 export function mixText(mix: Mix, seen: number): string {
+  const habits = `${pct(mix.middle)} go for the middle of the biggest gap, ${pct(mix.anywhere)} anywhere, ${pct(mix.hugger)} hug a neighbour`;
   const source =
     seen === 0
-      ? "That is a starting guess; it learns from the rounds you reveal."
-      : `Learned from ${seen} guess${seen === 1 ? "" : "es"} at your table, blended with a starting guess.`;
-  return `Each later player is drawn from a mix: ${pct(mix.middle)} go for the middle of the biggest gap, ${pct(mix.anywhere)} anywhere, ${pct(mix.hugger)} hug a neighbour to take the most. ${source}`;
+      ? "a starting guess until you reveal rounds"
+      : `learned from ${seen} guess${seen === 1 ? "" : "es"} here`;
+  return `Later players: ${habits}, ${source}.`;
 }
 
 export function resultText(won: readonly Guess[], secret: number): string {

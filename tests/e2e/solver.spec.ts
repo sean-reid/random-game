@@ -126,8 +126,7 @@ test("reveals the winner, keeps score, learns only from others, and restores fro
   await page.reload();
   await page.locator("#board summary").click();
   await expect(page.locator("#tally tbody tr")).toHaveCount(2);
-  await page.locator("details:has(#mix) summary").click();
-  await expect(page.locator("#mix")).toContainText("Learned from 1 guess at your table");
+  await expect(page.locator("#mix")).toContainText("learned from 1 guess here");
   await page.getByRole("button", { name: "Clear scoreboard and what it learned" }).click();
   await expect(page.locator("#board")).toBeHidden();
   await expect(page.locator("#mix")).toContainText("starting guess");
