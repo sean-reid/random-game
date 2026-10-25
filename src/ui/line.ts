@@ -38,7 +38,8 @@ export function renderLine(
   const { lo, hi } = board;
   const x = (n: number) => MARGIN + ((n - lo) / Math.max(1, hi - lo)) * (W - 2 * MARGIN);
   const sorted = [...board.guesses].sort((a, b) => a - b);
-  const shares = winEach(sorted, board);
+  const placed = rec.best === null ? sorted : [...sorted, rec.best].sort((a, b) => a - b);
+  const shares = winEach(placed, board);
   const pmax = Math.max(0, ...rec.curve.map((c) => c.p)) || 1;
   const parts: string[] = [];
 
@@ -74,7 +75,7 @@ export function renderLine(
     );
     const r = regionOf(
       g,
-      sorted.filter((o) => o !== g),
+      placed.filter((o) => o !== g),
       board,
     );
     if (r && r.end >= r.start) {
