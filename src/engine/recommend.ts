@@ -19,7 +19,7 @@ const FULL_SCAN = 400;
 const ROLLOUT_GRID = 200;
 const ROLLOUT_BUDGET = 60_000;
 const NOISE_SIGMAS = 2;
-const MIN_ROLLOUTS = 40;
+const MIN_ROLLOUTS = 120;
 const MAX_ROLLOUTS = 300;
 const LOW_QUANTILE = 0.1;
 
