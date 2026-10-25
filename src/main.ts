@@ -1,5 +1,14 @@
 import "./style.css";
-import { clampAfter, fitMix, MAX_AFTER, recommend, winEach, winners, type Mix } from "./engine";
+import {
+  clampAfter,
+  fitMix,
+  MAX_AFTER,
+  winEach,
+  winners,
+  type Mix,
+  type RolloutReply,
+} from "./engine";
+import { Recommender } from "./recommender";
 import {
   boardOf,
   cleanName,
@@ -32,6 +41,14 @@ let rounds: RoundLog[] = loadRounds(storage);
 let mix: Mix = fitMix(observationsOf(rounds));
 let revealed: number | null = null;
 let current: number | null = null;
+let settled: number | null = null;
+
+const worker = new Worker(new URL("./engine/worker.ts", import.meta.url), { type: "module" });
+const recommender = new Recommender(
+  (request) => worker.postMessage(request),
+  () => render(),
+);
+worker.addEventListener("message", (e: MessageEvent<RolloutReply>) => recommender.receive(e.data));
 
 const el = mount(document.getElementById("app") as HTMLElement, MAX_AFTER, NAME_MAX);
 el.lo.value = String(state.lo);
@@ -40,6 +57,10 @@ el.after.value = String(state.after);
 
 function say(message: string): void {
   el.note.textContent = message;
+}
+
+function markPending(on: boolean): void {
+  for (const part of [el.line, el.answer, el.odds]) part.classList.toggle("pending", on);
 }
 
 function syncUrl(): void {
@@ -73,6 +94,7 @@ function render(): void {
   for (const input of [el.lo, el.hi]) input.setAttribute("aria-invalid", range ? "false" : "true");
   if (!range) {
     renderChips(el.list, state.guesses, state, new Map(), locked, removeGuess);
+    markPending(false);
     el.line.innerHTML = "";
     el.answer.textContent = "";
     current = null;
@@ -81,8 +103,11 @@ function render(): void {
     return;
   }
   const b = boardOf(state);
-  const r = recommend(b, state.after, mix, current);
+  // The secret hides the recommendation, so a revealed round only needs the exact curve.
+  const k = locked ? 0 : state.after;
+  const { rec: r, pending } = recommender.get(b, k, mix, settled);
   current = r.best;
+  if (!pending) settled = r.best;
   const placed = r.best !== null && !locked ? [...b.guesses, r.best] : b.guesses;
   const shares = winEach(
     [...placed].sort((a, c) => a - c),
@@ -91,6 +116,7 @@ function render(): void {
   renderChips(el.list, state.guesses, state, shares, locked, removeGuess);
   const labels = new Map(state.guesses.filter((g) => g.name).map((g) => [g.n, g.name]));
   el.line.innerHTML = renderLine(b, r, el.line.clientWidth, labels, revealed);
+  markPending(pending);
   el.answer.hidden = locked;
   el.odds.hidden = locked;
   if (r.best === null) {
@@ -100,7 +126,7 @@ function render(): void {
     return;
   }
   el.answer.innerHTML = `Guess <em>${r.best}</em>`;
-  el.odds.textContent = oddsText(state.after, r.bestWin, r.bestLow);
+  el.odds.textContent = oddsText(pending ? 0 : state.after, r.bestWin, r.bestLow);
   el.guess.placeholder = String(r.best);
 }
 

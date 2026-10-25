@@ -65,6 +65,7 @@ test("rejects bad input with a message instead of silence", async ({ page }) => 
 
 test("tapping the line prefills the guess and marks it as mine", async ({ page }) => {
   await page.goto("./");
+  await expect(page.locator("#odds")).not.toHaveClass(/pending/);
   const box = await page.locator("#line").boundingBox();
   if (!box) throw new Error("no line");
   await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
