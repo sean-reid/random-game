@@ -43,11 +43,13 @@ function pickBest(curve: readonly CurvePoint[], sorted: readonly number[]): Curv
   return best;
 }
 
-function bestResponse(range: Range, sorted: readonly number[]): number | null {
+function bestReplies(range: Range, sorted: readonly number[]): number[] {
   const curve = candidates(range, sorted).map((x) => ({ x, p: winAt(x, sorted, range) }));
-  return pickBest(curve, sorted)?.x ?? null;
+  const top = Math.max(...curve.map((c) => c.p));
+  return curve.filter((c) => c.p >= top - 1e-12).map((c) => c.x);
 }
 
+// Later players take the best spot left; among equally good spots, the one that hurts me most.
 function afterLaterPlayers(
   x: number,
   range: Range,
@@ -57,8 +59,19 @@ function afterLaterPlayers(
   const state = [...sorted];
   insertSorted(state, x);
   for (let i = 0; i < after; i++) {
-    const reply = bestResponse(range, state);
-    if (reply === null) break;
+    const replies = bestReplies(range, state);
+    if (replies.length === 0) break;
+    let reply = replies[0] as number;
+    let left = Infinity;
+    for (const r of replies) {
+      const others = state.filter((g) => g !== x);
+      insertSorted(others, r);
+      const p = winAt(x, others, range);
+      if (p < left) {
+        left = p;
+        reply = r;
+      }
+    }
     insertSorted(state, reply);
   }
   return winAt(
