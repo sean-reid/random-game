@@ -165,3 +165,118 @@ footer a {
     transition-duration: 0.01ms !important;
   }
 }
+
+.stepper {
+  display: inline-flex;
+  align-items: stretch;
+}
+
+.stepper input {
+  width: 3.5rem;
+  text-align: center;
+}
+
+.stepper button {
+  padding: 0;
+}
+
+.line {
+  margin: 1.25rem 0 0.25rem;
+  touch-action: manipulation;
+  cursor: crosshair;
+  min-height: 1px;
+}
+
+.line-svg {
+  display: block;
+  overflow: visible;
+}
+
+.line-svg text {
+  font-family: var(--mono);
+  font-size: 12px;
+  fill: var(--ink-soft);
+}
+
+.line-svg .area {
+  fill: var(--ink);
+  opacity: 0.08;
+}
+
+.line-svg .curve {
+  fill: none;
+  stroke: var(--ink-soft);
+  stroke-width: 1.25;
+}
+
+.line-svg .axis {
+  stroke: var(--ink);
+}
+
+.line-svg .tick {
+  stroke: var(--ink-soft);
+}
+
+.line-svg .tick-lbl {
+  font-size: 11px;
+}
+
+.line-svg .guess {
+  stroke: var(--ink);
+  stroke-width: 2;
+}
+
+.line-svg .them {
+  stroke: var(--ink-soft);
+  fill: var(--ink-soft);
+}
+
+.line-svg .you {
+  stroke: var(--accent);
+  fill: var(--accent);
+  stroke-width: 1.5;
+}
+
+.line-svg .lbl {
+  stroke: none;
+}
+
+.line-svg .big {
+  stroke: none;
+  font-size: 22px;
+  font-weight: 600;
+}
+
+.line-svg .dot {
+  stroke: none;
+}
+
+.guesses li {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 44px;
+  padding: 0 0.25rem 0 0.6rem;
+}
+
+.guesses li button {
+  border: 0;
+  min-height: 36px;
+  min-width: 36px;
+  padding: 0;
+  color: var(--ink-soft);
+}
+
+details {
+  margin-top: 1.5rem;
+  color: var(--ink-soft);
+  max-width: 44rem;
+}
+
+summary {
+  cursor: pointer;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  color: var(--ink);
+}
