@@ -1,30 +1,18 @@
-<!DOCTYPE html>
-<html>
-<body>
-
-<h1>Random Number Game Solver</h1>
-<h2>Whoever guesses the closest number to the random number wins</h2>
-
-<p>Enter the min and max number and click GO.</p>
-<p>After each player begins guessing, enter their guesses and click GO for the optimal next guess.</p>
-
-<strong>Min Number</strong><br>
-<input type="text" name="minNumber" id="minNumber" size="15" maxlength="5" />
-<br><br>
-
-<strong>Max Number</strong><br>
-<input type="text" name="maxNumber" id="maxNumber" size="15" maxlength="5" />
-<br><br>
-
-<strong>Latest Guess</strong><br><input type="text" name="latestGuess" id="latestGuess" size="15" maxlength="5" />
-<br><br>
-
-<button id="button">GO</button>
-
-<script src="index.js"></script>
-<br><br>
-
-<strong>You Should Guess: </strong><p id="guess"></p>
-
-</body>
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light dark" />
+    <title>Random Game</title>
+    <meta
+      name="description"
+      content="Your best next guess in the closest-number-wins game, with the odds drawn on a number line."
+    />
+    <link rel="icon" href="data:," />
+  </head>
+  <body>
+    <main id="app"></main>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
 </html>
