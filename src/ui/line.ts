@@ -1,4 +1,4 @@
-import { regionOf, winEach, type Board, type Recommendation } from "../engine";
+import { regionOf, winEach, type Board, type Range, type Recommendation } from "../engine";
 import { ticks } from "./ticks";
 
 const CHAR = 7.2;
@@ -27,12 +27,19 @@ function bracket(x1: number, x2: number, y: number, cls: string, label: string):
   }`;
 }
 
-export function renderLine(board: Board, rec: Recommendation, width: number): string {
+export function renderLine(
+  board: Board,
+  rec: Recommendation,
+  width: number,
+  labels: ReadonlyMap<number, string> = new Map(),
+  secret: number | null = null,
+): string {
   const W = Math.max(280, width);
   const { lo, hi } = board;
   const x = (n: number) => MARGIN + ((n - lo) / Math.max(1, hi - lo)) * (W - 2 * MARGIN);
   const sorted = [...board.guesses].sort((a, b) => a - b);
-  const shares = winEach(sorted, board);
+  const placed = rec.best === null ? sorted : [...sorted, rec.best].sort((a, b) => a - b);
+  const shares = winEach(placed, board);
   const pmax = Math.max(0, ...rec.curve.map((c) => c.p)) || 1;
   const parts: string[] = [];
 
@@ -68,12 +75,18 @@ export function renderLine(board: Board, rec: Recommendation, width: number): st
     );
     const r = regionOf(
       g,
-      sorted.filter((o) => o !== g),
+      placed.filter((o) => o !== g),
       board,
     );
     if (r && r.end >= r.start) {
       parts.push(
-        bracket(x(r.start), x(r.end), THEM, "them", `${g} owns ${pct(shares.get(g) ?? 0)}`),
+        bracket(
+          x(r.start),
+          x(r.end),
+          THEM,
+          "them",
+          `${labels.get(g) ?? g} owns ${pct(shares.get(g) ?? 0)}`,
+        ),
       );
     }
   }
@@ -92,6 +105,14 @@ export function renderLine(board: Board, rec: Recommendation, width: number): st
     }
   }
 
+  if (secret !== null && secret >= lo && secret <= hi) {
+    const sx = fmt(x(secret));
+    parts.push(
+      `<line class="secret" x1="${sx}" x2="${sx}" y1="${HEAD}" y2="${LINE}"/>`,
+      `<text class="secret-lbl" x="${sx}" y="${HEAD - 8}" text-anchor="middle">${secret}</text>`,
+    );
+  }
+
   const label =
     rec.best === null
       ? `Number line from ${lo} to ${hi}; every number is taken`
@@ -99,7 +120,7 @@ export function renderLine(board: Board, rec: Recommendation, width: number): st
   return `<svg class="line-svg" width="${W}" height="${HEIGHT}" viewBox="0 0 ${W} ${HEIGHT}" role="img" aria-label="${esc(label)}">${parts.join("")}</svg>`;
 }
 
-export function numberAt(board: Board, width: number, px: number): number {
+export function numberAt(board: Range, width: number, px: number): number {
   const W = Math.max(280, width);
   const t = (px - MARGIN) / (W - 2 * MARGIN);
   return Math.round(board.lo + Math.min(1, Math.max(0, t)) * (board.hi - board.lo));

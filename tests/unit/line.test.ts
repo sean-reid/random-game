@@ -6,15 +6,28 @@ const board = { lo: 1, hi: 100, guesses: [30, 80] };
 const rec = recommend(board, 1);
 
 describe("renderLine", () => {
-  it("marks the recommended guess and what everyone owns", () => {
+  it("marks the recommended guess and what everyone owns once it is placed", () => {
     const svg = renderLine(board, rec, 960);
     expect(svg).toContain(">25<");
-    expect(svg).toContain("30 owns 55%");
+    expect(svg).toContain("30 owns 28%");
     expect(svg).toContain("80 owns 46%");
     expect(svg).toContain("you own 27%");
     expect(svg).toContain(
       'aria-label="Number line from 1 to 100 with 2 guesses; recommended guess 25',
     );
+  });
+
+  it("labels a stretch by name when given one", () => {
+    const svg = renderLine(board, rec, 960, new Map([[30, "Ana"]]));
+    expect(svg).toContain("Ana owns 28%");
+    expect(svg).toContain("80 owns 46%");
+  });
+
+  it("marks the revealed number", () => {
+    const svg = renderLine(board, rec, 960, new Map(), 33);
+    expect(svg).toContain('class="secret"');
+    expect(svg).toContain('class="secret-lbl"');
+    expect(renderLine(board, rec, 960, new Map(), 500)).not.toContain('class="secret"');
   });
 
   it("uses round-number ticks and keeps the ends", () => {
@@ -31,7 +44,7 @@ describe("renderLine", () => {
     expect(svg).toContain("30 owns 30%");
     expect(svg).not.toContain("31 owns");
     const narrow = renderLine(board, rec, 320);
-    expect(narrow).toContain("55%");
+    expect(narrow).toContain("46%");
   });
 
   it("says when the range is full", () => {
