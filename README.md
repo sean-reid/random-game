@@ -1,6 +1,6 @@
 # Random Game
 
-Someone picks a number in a range, everyone guesses, closest wins. This tool tells you what to guess next and shows why.
+Someone picks a number in a range, everyone guesses, closest wins. This tool tells you what to guess next and draws why on a number line: the stretch each guess owns, how much of the range you would own from every spot, and the best one marked. Tap the line to pick a number, set how many players still guess after you, and the answer updates.
 
 Live at https://sean-reid.github.io/random-game/. The idea is written up at https://sean-reid.github.io/blog/random-game.html.
 
