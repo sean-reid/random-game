@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { recommend } from "../../src/engine";
-import { numberAt, renderLine } from "../../src/ui/line";
+import { numberAt, renderLine, shortName } from "../../src/ui/line";
 
 const board = { lo: 1, hi: 100, guesses: [30, 80] };
 const rec = recommend(board, 1);
@@ -38,14 +38,25 @@ describe("renderLine", () => {
     expect(svg).not.toContain(">80<");
   });
 
-  it("shortens bracket text to the percentage before dropping it", () => {
+  it("keeps a short name on the bracket before falling back to the percentage", () => {
     const tight = { lo: 1, hi: 100, guesses: [30, 31, 32] };
     const svg = renderLine(tight, recommend(tight, 0), 960);
     expect(svg).toContain("30 owns 30%");
     expect(svg).not.toContain("31 owns");
+    const names = new Map([
+      [30, "Annabel"],
+      [80, "Ben"],
+    ]);
     const narrow = renderLine(board, rec, 320);
-    expect(narrow).toContain(">28%<");
+    expect(narrow).toContain(">30 28%<");
     expect(narrow).toMatch(/class="you lbl"[^>]*>27%</);
+    const named = renderLine(board, rec, 320, names);
+    expect(named).toContain(">Ann. 28%<");
+    expect(named).toContain(">Ben owns 46%<");
+    const tiny = renderLine(board, rec, 200, names);
+    expect(tiny).toContain(">28%<");
+    expect(shortName("Ann")).toBe("Ann");
+    expect(shortName("Annabel")).toBe("Ann.");
   });
 
   it("shows the revealed number instead of the recommendation", () => {

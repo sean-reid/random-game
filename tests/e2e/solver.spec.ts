@@ -15,6 +15,7 @@ test("draws the line and recommends a guess", async ({ page }, testInfo) => {
   await page.getByLabel("Guessed", { exact: true }).fill("80");
   await page.getByLabel("Guessed", { exact: true }).press("Enter");
   await expect(page.locator("#list li")).toHaveCount(2);
+  await expect(page.locator("#list li .share")).toHaveText(["28%", "46%"]);
   await expect(page).toHaveURL(/\?g=30%3AAna%2C80$/);
 
   const svg = page.locator("svg.line-svg");
@@ -29,7 +30,7 @@ test("draws the line and recommends a guess", async ({ page }, testInfo) => {
   await expect(page.locator("#odds")).toContainText("if nobody guesses after you");
   await expect(page.getByRole("button", { name: "Fewer players after me" })).toBeDisabled();
   await page.getByRole("button", { name: "Remove 80" }).click();
-  await expect(page.locator("#list li")).toHaveText(["Ana 30×"]);
+  await expect(page.locator("#list li")).toHaveText(["Ana 3030%×"]);
   await expect(page.locator("#answer")).toContainText("31");
   await page.getByRole("button", { name: "Undo" }).click();
   await expect(page.locator("#list li")).toHaveCount(0);
@@ -43,7 +44,7 @@ test("the URL follows a range edit and guesses inside the new range survive it",
   await expect(page).toHaveURL(/\?hi=50&g=30%3AAna%2C80%3ABen$/);
   await expect(page.locator("#list li")).toHaveCount(2);
   await page.locator("#hi").blur();
-  await expect(page.locator("#list li")).toHaveText(["Ana 30×"]);
+  await expect(page.locator("#list li")).toHaveText(["Ana 3053%×"]);
   await expect(page).toHaveURL(/\?hi=50&g=30%3AAna$/);
 });
 
@@ -106,7 +107,7 @@ test("reveals the winner, keeps score, learns only from others, and restores fro
   await page.goto("./?lo=1&hi=50&k=2&g=10%3AAna%2C*40%3ABen");
   await expect(page.locator("#hi")).toHaveValue("50");
   await expect(page.getByLabel("Players after me", { exact: true })).toHaveValue("2");
-  await expect(page.locator("#list li")).toHaveText(["Ana 10×", "Ben 40 (me)×"]);
+  await expect(page.locator("#list li")).toHaveText(["Ana 1033%×", "Ben 40 (me)37%×"]);
 
   await page.getByLabel("The number was").fill("33");
   await page.getByLabel("The number was").press("Enter");

@@ -29,18 +29,18 @@ function scale(range: Range, width: number): (n: number) => number {
   return (n) => MARGIN + ((n - range.lo) / Math.max(1, range.hi - range.lo)) * (W - 2 * MARGIN);
 }
 
+// Labels are tried longest first; the "you" row is alone, so its last label is clamped on screen.
 function bracket(
   x1: number,
   x2: number,
   y: number,
   cls: string,
-  label: string,
+  labels: string[],
   W?: number,
 ): string {
   const width = x2 - x1;
-  let text = label;
-  if (width < label.length * CHAR_W + 8) text = /\d+%/.exec(label)?.[0] ?? "";
-  if (W === undefined && width < text.length * CHAR_W + 4) text = "";
+  let text = labels.find((l) => width >= l.length * CHAR_W + 8) ?? "";
+  if (W !== undefined && text === "") text = labels[labels.length - 1] ?? "";
   let cx = (x1 + x2) / 2;
   if (W !== undefined) {
     const half = (text.length * CHAR_W) / 2 + 4;
@@ -51,6 +51,10 @@ function bracket(
       ? `<text class="${cls} lbl" x="${fmt(cx)}" y="${y + 16}" text-anchor="middle">${esc(text)}</text>`
       : ""
   }`;
+}
+
+export function shortName(name: string, max = 4): string {
+  return name.length > max ? `${name.slice(0, max - 1)}.` : name;
 }
 
 export function renderLine(
@@ -108,10 +112,12 @@ export function renderLine(
     const others = placed.filter((o) => o !== g);
     const r = regionOf(g, others, board);
     if (r && r.end >= r.start) {
-      const share = winAt(g, others, board);
-      parts.push(
-        bracket(x(r.start), x(r.end), Y_THEM, "them", `${labels.get(g) ?? g} owns ${pct(share)}`),
-      );
+      const share = pct(winAt(g, others, board));
+      const who = labels.get(g);
+      const options = who
+        ? [`${who} owns ${share}`, `${shortName(who)} ${share}`, share]
+        : [`${g} owns ${share}`, `${g} ${share}`, share];
+      parts.push(bracket(x(r.start), x(r.end), Y_THEM, "them", options));
     }
   }
 
@@ -125,8 +131,8 @@ export function renderLine(
     );
     const mine = regionOf(rec.best, sorted, board);
     if (mine && mine.end >= mine.start) {
-      const now = winAt(rec.best, sorted, board);
-      parts.push(bracket(x(mine.start), x(mine.end), Y_YOU, "you", `you own ${pct(now)} now`, W));
+      const now = pct(winAt(rec.best, sorted, board));
+      parts.push(bracket(x(mine.start), x(mine.end), Y_YOU, "you", [`you own ${now} now`, now], W));
     }
   }
 

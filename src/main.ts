@@ -1,5 +1,5 @@
 import "./style.css";
-import { fitMix, MAX_AFTER, recommend, winners, clampAfter, type Mix } from "./engine";
+import { fitMix, MAX_AFTER, recommend, winEach, winners, clampAfter, type Mix } from "./engine";
 import {
   boardOf,
   cleanName,
@@ -19,7 +19,7 @@ import {
   type State,
   type Tally,
 } from "./state";
-import { labelOf, mixText, oddsText, resultText } from "./ui/copy";
+import { labelOf, mixText, oddsText, pct, resultText } from "./ui/copy";
 import { numberAt, renderLine } from "./ui/line";
 
 const app = document.getElementById("app") as HTMLElement;
@@ -117,13 +117,20 @@ function knownNames(): string[] {
   return [...new Set([...Object.keys(tally), ...state.guesses.map((g) => g.name)])].filter(Boolean);
 }
 
-function renderList(): void {
+function renderList(shares: ReadonlyMap<number, number>): void {
   list.replaceChildren(
     ...state.guesses.map((g) => {
       const li = document.createElement("li");
       if (!inRange(state, g.n)) li.classList.add("outside");
       li.append(g.name ? `${g.name} ${g.n}` : String(g.n));
       if (g.mine) li.append(" (me)");
+      const share = shares.get(g.n);
+      if (share !== undefined) {
+        const s = document.createElement("span");
+        s.className = "share";
+        s.textContent = pct(share);
+        li.append(s);
+      }
       const x = document.createElement("button");
       x.type = "button";
       x.textContent = "×";
@@ -175,7 +182,6 @@ function render(): void {
     state.lo = range.lo;
     state.hi = range.hi;
   }
-  renderList();
   renderTally();
   syncUrl();
   mixPara.textContent = mixText(mix, observationsOf(rounds).length);
@@ -183,6 +189,7 @@ function render(): void {
   more.disabled = state.after === MAX_AFTER;
   for (const el of [lo, hi]) el.setAttribute("aria-invalid", range ? "false" : "true");
   if (!range) {
+    renderList(new Map());
     line.innerHTML = "";
     answer.textContent = "";
     current = null;
@@ -191,8 +198,15 @@ function render(): void {
     return;
   }
   const b = boardOf(state);
-  const r = recommend(b, state.after, mix);
+  const r = recommend(b, state.after, mix, current);
   current = r.best;
+  const placed = r.best !== null && revealed === null ? [...b.guesses, r.best] : b.guesses;
+  renderList(
+    winEach(
+      [...placed].sort((a, c) => a - c),
+      b,
+    ),
+  );
   const labels = new Map(state.guesses.filter((g) => g.name).map((g) => [g.n, g.name]));
   line.innerHTML = renderLine(b, r, line.clientWidth, labels, revealed);
   answer.hidden = revealed !== null;
