@@ -1,7 +1,14 @@
-import { freeCount, hugSpots, middleSpots, nthFree, PRIOR_MIX, type Mix } from "./opponents";
+import {
+  freeCount,
+  hugSpotsInto,
+  middleSpotsInto,
+  nthFree,
+  PRIOR_MIX,
+  type Mix,
+} from "./opponents";
 import { mulberry32 } from "./random";
 import type { Board, CurvePoint, Range, Recommendation } from "./types";
-import { insertSorted, isFree, lowerBound, winAt } from "./win";
+import { insertInto, isFree, lowerBound, shareBetween, winAt } from "./win";
 
 export const MAX_AFTER = 12;
 
@@ -15,6 +22,13 @@ const NOISE_SIGMAS = 2;
 const MIN_ROLLOUTS = 40;
 const MAX_ROLLOUTS = 300;
 const LOW_QUANTILE = 0.1;
+
+export function rolloutCount(candidates: number, after: number): number {
+  return Math.max(
+    MIN_ROLLOUTS,
+    Math.min(MAX_ROLLOUTS, Math.round(ROLLOUT_BUDGET / Math.max(1, candidates * after))),
+  );
+}
 
 function candidates(range: Range, taken: readonly number[], grid: number): number[] {
   const { lo, hi } = range;
@@ -67,25 +81,62 @@ function pickBest(
   return best;
 }
 
-// One later player's guess: a type drawn from the mix, then that type's rule.
+// One later player's guess: a type drawn from the mix, then that type's rule. The
+// state is the first len entries of buf; spots is scratch for the rule's list.
 function reply(
   range: Range,
-  state: readonly number[],
+  buf: readonly number[],
+  len: number,
   mix: Mix,
   uType: number,
   uSpot: number,
+  spots: number[],
 ): number | null {
-  if (freeCount(range, state) <= 0) return null;
-  let spots: number[];
-  if (uType < mix.middle) spots = middleSpots(range, state);
-  else if (uType < mix.middle + mix.anywhere) {
-    return nthFree(range, state, Math.floor(uSpot * freeCount(range, state)));
-  } else spots = hugSpots(range, state);
-  if (spots.length === 0) return nthFree(range, state, Math.floor(uSpot * freeCount(range, state)));
-  return spots[Math.floor(uSpot * spots.length)] as number;
+  const open = freeCount(range, buf, len);
+  if (open <= 0) return null;
+  let count: number;
+  if (uType < mix.middle) count = middleSpotsInto(range, buf, len, spots);
+  else if (uType < mix.middle + mix.anywhere)
+    return nthFree(range, buf, Math.floor(uSpot * open), len);
+  else count = hugSpotsInto(range, buf, len, spots);
+  if (count === 0) return nthFree(range, buf, Math.floor(uSpot * open), len);
+  return spots[Math.floor(uSpot * count)] as number;
 }
 
-function quantile(sortedValues: number[], q: number): number {
+// Plays the rest of the round out once per noise row with x placed, writing x's final
+// share into shares. buf holds the board, x and up to k replies; spots is scratch.
+function rollout(
+  board: Range,
+  sorted: readonly number[],
+  x: number,
+  k: number,
+  mix: Mix,
+  noise: Float64Array,
+  shares: Float64Array,
+  buf: number[],
+  spots: number[],
+): void {
+  for (let r = 0; r < shares.length; r++) {
+    for (let i = 0; i < sorted.length; i++) buf[i] = sorted[i] as number;
+    let len = sorted.length;
+    insertInto(buf, len++, x);
+    for (let i = 0; i < k; i++) {
+      const u = r * 2 * k + 2 * i;
+      const g = reply(board, buf, len, mix, noise[u] as number, noise[u + 1] as number, spots);
+      if (g === null) break;
+      insertInto(buf, len++, g);
+    }
+    const at = lowerBound(buf, x, len);
+    shares[r] = shareBetween(
+      x,
+      at > 0 ? (buf[at - 1] as number) : undefined,
+      at + 1 < len ? (buf[at + 1] as number) : undefined,
+      board,
+    );
+  }
+}
+
+function quantile(sortedValues: Float64Array, q: number): number {
   if (sortedValues.length === 0) return 0;
   const i = Math.min(sortedValues.length - 1, Math.floor(q * sortedValues.length));
   return sortedValues[i] as number;
@@ -109,39 +160,23 @@ export function recommend(
       return { x, p, low: p, se: 0 };
     });
   } else {
-    const rollouts = Math.max(
-      MIN_ROLLOUTS,
-      Math.min(MAX_ROLLOUTS, Math.round(ROLLOUT_BUDGET / Math.max(1, xs.length * k))),
-    );
+    const rollouts = rolloutCount(xs.length, k);
     const rng = mulberry32(seed);
-    const noise: number[][] = [];
-    for (let r = 0; r < rollouts; r++) {
-      const row: number[] = [];
-      for (let i = 0; i < 2 * k; i++) row.push(rng());
-      noise.push(row);
-    }
+    const noise = new Float64Array(rollouts * 2 * k);
+    for (let i = 0; i < noise.length; i++) noise[i] = rng();
+    const shares = new Float64Array(rollouts);
+    const buf: number[] = new Array<number>(sorted.length + k + 1).fill(0);
+    const spots: number[] = [];
     curve = xs.map((x) => {
-      const shares: number[] = [];
-      for (const row of noise) {
-        const state = [...sorted];
-        insertSorted(state, x);
-        for (let i = 0; i < k; i++) {
-          const g = reply(board, state, mix, row[2 * i] as number, row[2 * i + 1] as number);
-          if (g === null) break;
-          insertSorted(state, g);
-        }
-        shares.push(
-          winAt(
-            x,
-            state.filter((g) => g !== x),
-            board,
-          ),
-        );
-      }
+      rollout(board, sorted, x, k, mix, noise, shares, buf, spots);
       const n = shares.length;
-      const mean = shares.reduce((a, b) => a + b, 0) / n;
-      const variance = shares.reduce((a, b) => a + (b - mean) ** 2, 0) / Math.max(1, n - 1);
-      shares.sort((a, b) => a - b);
+      let sum = 0;
+      for (let i = 0; i < n; i++) sum += shares[i] as number;
+      const mean = sum / n;
+      let squares = 0;
+      for (let i = 0; i < n; i++) squares += ((shares[i] as number) - mean) ** 2;
+      const variance = squares / Math.max(1, n - 1);
+      shares.sort();
       return {
         x,
         p: mean,
