@@ -17,6 +17,19 @@ describe("renderLine", () => {
     );
   });
 
+  it("labels a stretch by name when given one", () => {
+    const svg = renderLine(board, rec, 960, new Map([[30, "Ana"]]));
+    expect(svg).toContain("Ana owns 55%");
+    expect(svg).toContain("80 owns 46%");
+  });
+
+  it("marks the revealed number", () => {
+    const svg = renderLine(board, rec, 960, new Map(), 33);
+    expect(svg).toContain('class="secret"');
+    expect(svg).toContain('class="secret-lbl"');
+    expect(renderLine(board, rec, 960, new Map(), 500)).not.toContain('class="secret"');
+  });
+
   it("uses round-number ticks and keeps the ends", () => {
     const svg = renderLine(board, rec, 960);
     expect(svg).toContain(">50<");

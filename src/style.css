@@ -251,6 +251,18 @@ footer a {
   stroke: none;
 }
 
+.line-svg .secret {
+  stroke: var(--ink);
+  stroke-width: 1.5;
+  stroke-dasharray: 3 3;
+}
+
+.line-svg .secret-lbl {
+  fill: var(--ink);
+  font-size: 14px;
+  font-weight: 600;
+}
+
 .guesses li {
   display: inline-flex;
   align-items: center;
@@ -279,4 +291,39 @@ summary {
   display: flex;
   align-items: center;
   color: var(--ink);
+}
+
+input[type="text"] {
+  width: 9rem;
+}
+
+.reveal {
+  margin-top: 1rem;
+}
+
+.result {
+  font-size: 1.25rem;
+  min-height: 1.5rem;
+}
+
+table {
+  border-collapse: collapse;
+  font-family: var(--mono);
+  margin: 0.5rem 0 0.75rem;
+}
+
+th,
+td {
+  text-align: left;
+  padding: 0.35rem 1.25rem 0.35rem 0;
+  border-bottom: 1px solid var(--rule);
+}
+
+th {
+  font-weight: 500;
+  color: var(--ink-soft);
+}
+
+details[hidden] {
+  display: none;
 }
