@@ -11,6 +11,7 @@ export interface CurvePoint {
   x: number;
   p: number;
   low: number;
+  se: number;
 }
 
 export interface Recommendation {

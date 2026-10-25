@@ -1,4 +1,4 @@
-import { readdirSync, readFileSync, statSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { gzipSync } from "node:zlib";
 
@@ -6,6 +6,10 @@ const JS_BUDGET = 40 * 1024;
 const TOTAL_BUDGET = 80 * 1024;
 
 const dist = new URL("../dist", import.meta.url).pathname;
+if (!existsSync(dist)) {
+  console.error("dist is missing; run npm run build first");
+  process.exit(1);
+}
 const sizes = [];
 const walk = (dir) => {
   for (const name of readdirSync(dir)) {
@@ -17,6 +21,10 @@ const walk = (dir) => {
   }
 };
 walk(dist);
+if (!sizes.some((s) => s.path === "index.html")) {
+  console.error("dist has no index.html; the build is incomplete");
+  process.exit(1);
+}
 
 const js = sizes.filter((s) => s.path.endsWith(".js")).reduce((a, s) => a + s.gz, 0);
 const total = sizes.reduce((a, s) => a + s.gz, 0);

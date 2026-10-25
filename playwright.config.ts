@@ -35,7 +35,7 @@ export default defineConfig({
   webServer: {
     command: `npm run build && npx vite preview --port ${port} --host 127.0.0.1 --strictPort`,
     url: `http://127.0.0.1:${port}/random-game/`,
-    reuseExistingServer: !process.env.CI,
+    reuseExistingServer: false,
     timeout: 180_000,
   },
 });

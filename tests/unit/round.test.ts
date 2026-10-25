@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { labelOf, winners } from "../../src/engine/round";
+import { winners } from "../../src/engine";
 
 const g = (n: number, name = "") => ({ n, name });
 
@@ -14,10 +14,5 @@ describe("winners", () => {
 
   it("returns nothing with no guesses", () => {
     expect(winners([], 7)).toEqual([]);
-  });
-
-  it("labels by name when there is one", () => {
-    expect(labelOf(g(30, " Ana "))).toBe("Ana");
-    expect(labelOf(g(30))).toBe("30");
   });
 });

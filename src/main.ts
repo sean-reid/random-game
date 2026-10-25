@@ -1,12 +1,17 @@
 import "./style.css";
-import { fitMix, MAX_AFTER, recommend, type Mix } from "./engine";
-import { labelOf, winners, type Guess } from "./engine/round";
+import { fitMix, MAX_AFTER, recommend, winners, clampAfter, type Mix } from "./engine";
 import {
+  boardOf,
+  cleanName,
   fromQuery,
+  inRange,
   loadRounds,
   loadTally,
+  NAME_MAX,
   observationsOf,
+  parseRange,
   recordRound,
+  safeStorage,
   saveRounds,
   saveTally,
   toQuery,
@@ -14,12 +19,14 @@ import {
   type State,
   type Tally,
 } from "./state";
+import { labelOf, mixText, oddsText, resultText } from "./ui/copy";
 import { numberAt, renderLine } from "./ui/line";
 
 const app = document.getElementById("app") as HTMLElement;
+const storage = safeStorage(() => localStorage);
 const state: State = fromQuery(location.search);
-let tally: Tally = loadTally(localStorage);
-let rounds: RoundLog[] = loadRounds(localStorage);
+let tally: Tally = loadTally(storage);
+let rounds: RoundLog[] = loadRounds(storage);
 let mix: Mix = fitMix(observationsOf(rounds));
 let revealed: number | null = null;
 let current: number | null = null;
@@ -30,21 +37,23 @@ app.innerHTML = `
   <div class="row">
     <label>From <input id="lo" type="number" inputmode="numeric" /></label>
     <label>To <input id="hi" type="number" inputmode="numeric" /></label>
-    <label>Players after me
+    <div class="field">
+      <label for="after">Players after me</label>
       <span class="stepper">
         <button id="fewer" type="button" aria-label="Fewer players after me">−</button>
         <input id="after" type="number" inputmode="numeric" min="0" max="${MAX_AFTER}" />
         <button id="more" type="button" aria-label="More players after me">+</button>
       </span>
-    </label>
+    </div>
   </div>
   <div class="line" id="line"></div>
   <p class="answer" id="answer"></p>
-  <p class="soft" id="odds"></p>
+  <p class="soft" id="odds" aria-live="polite"></p>
   <hr />
   <div class="row">
-    <label>Who <input id="name" type="text" list="names" autocomplete="off" maxlength="24" placeholder="optional" /></label>
+    <label>Who <input id="name" type="text" list="names" autocomplete="off" maxlength="${NAME_MAX}" placeholder="optional" /></label>
     <label>Guessed <input id="guess" type="number" inputmode="numeric" /></label>
+    <label class="check"><input id="mine" type="checkbox" /> that's me</label>
     <button id="add" type="button">Add</button>
     <button id="undo" type="button" disabled>Undo</button>
   </div>
@@ -56,15 +65,12 @@ app.innerHTML = `
     <button id="next" type="button" hidden>New round</button>
   </div>
   <p id="result" class="result" aria-live="polite"></p>
+  <p id="note" class="soft note" aria-live="polite"></p>
   <details id="board">
     <summary>Scoreboard</summary>
     <table id="tally"></table>
-    <button id="reset" type="button">Clear scoreboard</button>
-  </details>
-  <details>
-    <summary>How this works</summary>
-    <p>Every guess owns the numbers it is closest to, and the secret number is taken to be anywhere in the range with equal chance. The grey curve is the share of the range you would end up with from each spot once the players still to come have guessed, averaged over a few hundred plays of the rest of the round. The darker band underneath is a bad round, the share you keep in the worst tenth of those plays. The marker is the top of the curve.</p>
-    <p id="mix"></p>
+    <p id="mix" class="soft"></p>
+    <button id="reset" type="button">Clear scoreboard and what it learned</button>
   </details>
   <footer><a href="https://github.com/sean-reid/random-game">Source</a> · <a href="https://sean-reid.github.io/blog/random-game.html">Why this works</a></footer>
 `;
@@ -73,8 +79,11 @@ const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as 
 const lo = $<HTMLInputElement>("lo");
 const hi = $<HTMLInputElement>("hi");
 const after = $<HTMLInputElement>("after");
+const fewer = $<HTMLButtonElement>("fewer");
+const more = $<HTMLButtonElement>("more");
 const name = $<HTMLInputElement>("name");
 const guess = $<HTMLInputElement>("guess");
+const mineBox = $<HTMLInputElement>("mine");
 const add = $<HTMLButtonElement>("add");
 const undo = $<HTMLButtonElement>("undo");
 const list = $<HTMLUListElement>("list");
@@ -86,21 +95,18 @@ const secret = $<HTMLInputElement>("secret");
 const reveal = $<HTMLButtonElement>("reveal");
 const next = $<HTMLButtonElement>("next");
 const result = $<HTMLParagraphElement>("result");
+const note = $<HTMLParagraphElement>("note");
 const tallyTable = $<HTMLTableElement>("tally");
 const board = $<HTMLDetailsElement>("board");
+const reset = $<HTMLButtonElement>("reset");
+const mixPara = $<HTMLParagraphElement>("mix");
 
 lo.value = String(state.lo);
 hi.value = String(state.hi);
 after.value = String(state.after);
 
-function readRange(): boolean {
-  const a = Number.parseInt(lo.value, 10);
-  const b = Number.parseInt(hi.value, 10);
-  if (!Number.isFinite(a) || !Number.isFinite(b) || a >= b) return false;
-  state.lo = a;
-  state.hi = b;
-  state.guesses = state.guesses.filter((g) => g.n >= a && g.n <= b);
-  return true;
+function say(message: string): void {
+  note.textContent = message;
 }
 
 function syncUrl(): void {
@@ -115,11 +121,14 @@ function renderList(): void {
   list.replaceChildren(
     ...state.guesses.map((g) => {
       const li = document.createElement("li");
+      if (!inRange(state, g.n)) li.classList.add("outside");
       li.append(g.name ? `${g.name} ${g.n}` : String(g.n));
+      if (g.mine) li.append(" (me)");
       const x = document.createElement("button");
       x.type = "button";
       x.textContent = "×";
       x.setAttribute("aria-label", `Remove ${labelOf(g)}`);
+      x.disabled = revealed !== null;
       x.addEventListener("click", () => {
         state.guesses = state.guesses.filter((v) => v !== g);
         render();
@@ -128,7 +137,8 @@ function renderList(): void {
       return li;
     }),
   );
-  undo.disabled = state.guesses.length === 0;
+  undo.disabled = state.guesses.length === 0 || revealed !== null;
+  add.disabled = revealed !== null;
   names.replaceChildren(
     ...knownNames().map((n) => {
       const o = document.createElement("option");
@@ -148,6 +158,7 @@ function renderTally(): void {
   const head = tallyTable.createTHead().insertRow();
   for (const h of ["Player", "Wins", "Rounds"]) {
     const th = document.createElement("th");
+    th.scope = "col";
     th.textContent = h;
     head.append(th);
   }
@@ -158,96 +169,88 @@ function renderTally(): void {
   }
 }
 
-function oddsText(p: number, low: number): string {
-  const pc = (v: number) => `${Math.round(v * 100)}%`;
-  if (state.after === 0) return `${pc(p)} chance to win if nobody guesses after you.`;
-  const who = state.after === 1 ? "1 more player" : `${state.after} more players`;
-  return `${pc(p)} expected after ${who}, ${pc(low)} in a bad round.`;
-}
-
-function mixText(): string {
-  const pc = (v: number) => `${Math.round(v * 100)}%`;
-  const seen = observationsOf(rounds).length;
-  const source =
-    seen === 0
-      ? "That is a starting guess; it learns from the rounds you reveal."
-      : `Learned from ${seen} guess${seen === 1 ? "" : "es"} at your table, blended with a starting guess.`;
-  return `Each later player is drawn from a mix: ${pc(mix.middle)} go for the middle of the biggest gap, ${pc(mix.anywhere)} anywhere, ${pc(mix.hugger)} hug a neighbour to take the most. ${source}`;
-}
-
 function render(): void {
+  const range = parseRange(lo.value, hi.value);
+  if (range) {
+    state.lo = range.lo;
+    state.hi = range.hi;
+  }
   renderList();
   renderTally();
   syncUrl();
-  if (!readRange()) {
+  mixPara.textContent = mixText(mix, observationsOf(rounds).length);
+  fewer.disabled = state.after === 0;
+  more.disabled = state.after === MAX_AFTER;
+  for (const el of [lo, hi]) el.setAttribute("aria-invalid", range ? "false" : "true");
+  if (!range) {
     line.innerHTML = "";
     answer.textContent = "";
+    current = null;
+    guess.placeholder = "";
     odds.textContent = "The range needs a smaller first number and a larger second one.";
     return;
   }
-  const numbers = state.guesses.map((g) => g.n);
-  const r = recommend({ ...state, guesses: numbers }, state.after, mix);
+  const b = boardOf(state);
+  const r = recommend(b, state.after, mix);
   current = r.best;
-  $<HTMLParagraphElement>("mix").textContent = mixText();
   const labels = new Map(state.guesses.filter((g) => g.name).map((g) => [g.n, g.name]));
-  line.innerHTML = renderLine(
-    { ...state, guesses: numbers },
-    r,
-    line.clientWidth,
-    labels,
-    revealed,
-  );
+  line.innerHTML = renderLine(b, r, line.clientWidth, labels, revealed);
   answer.hidden = revealed !== null;
   odds.hidden = revealed !== null;
   if (r.best === null) {
     answer.textContent = "";
+    guess.placeholder = "";
     odds.textContent = "Every number is taken.";
     return;
   }
   answer.innerHTML = `Guess <em>${r.best}</em>`;
-  odds.textContent = oddsText(r.bestWin, r.bestLow);
+  odds.textContent = oddsText(state.after, r.bestWin, r.bestLow);
   guess.placeholder = String(r.best);
 }
 
+function pruneOutside(): void {
+  state.guesses = state.guesses.filter((g) => inRange(state, g.n));
+  render();
+}
+
 function addGuess(): void {
+  if (revealed !== null) return;
   const n = Number.parseInt(guess.value, 10);
-  if (!Number.isFinite(n) || !readRange() || n < state.lo || n > state.hi) return;
-  if (!state.guesses.some((g) => g.n === n)) {
-    state.guesses.push({ n, name: name.value.trim(), mine: n === current });
-  }
+  if (!Number.isSafeInteger(n)) return say("Type a whole number to add.");
+  if (!parseRange(lo.value, hi.value)) return say("Fix the range first.");
+  if (!inRange(state, n)) return say(`${n} is outside ${state.lo} to ${state.hi}.`);
+  if (state.guesses.some((g) => g.n === n)) return say(`${n} is already taken.`);
+  const g = { n, name: cleanName(name.value) };
+  state.guesses.push(mineBox.checked ? { ...g, mine: true } : g);
+  say("");
   guess.value = "";
   name.value = "";
+  mineBox.checked = false;
   name.focus();
   render();
 }
 
 function setAfter(k: number): void {
-  state.after = Math.max(0, Math.min(MAX_AFTER, k));
+  state.after = clampAfter(k);
   after.value = String(state.after);
   render();
 }
 
-function describe(won: Guess[], n: number): string {
-  if (won.length === 0) return "Nobody guessed.";
-  const first = won[0] as Guess;
-  const gap = Math.abs(first.n - n);
-  const by = gap === 0 ? "exactly" : gap === 1 ? "by 1" : `by ${gap}`;
-  if (won.length === 1)
-    return `${labelOf(first)} wins with ${first.n}, ${by === "exactly" ? "spot on" : `off ${by}`}.`;
-  return `${won.map(labelOf).join(" and ")} tie, each off by ${gap}.`;
-}
-
 reveal.addEventListener("click", () => {
+  if (revealed !== null) return;
   const n = Number.parseInt(secret.value, 10);
-  if (!Number.isFinite(n) || !readRange() || n < state.lo || n > state.hi || revealed !== null)
-    return;
+  if (!Number.isSafeInteger(n)) return say("Type the number that was picked.");
+  if (!parseRange(lo.value, hi.value)) return say("Fix the range first.");
+  if (!inRange(state, n)) return say(`${n} is outside ${state.lo} to ${state.hi}.`);
+  say("");
+  state.guesses = state.guesses.filter((g) => inRange(state, g.n));
   revealed = n;
   const won = winners(state.guesses, n);
-  result.textContent = describe(won, n);
+  result.textContent = resultText(won, n);
   const named = state.guesses.map((g) => g.name).filter(Boolean);
   if (named.length) {
     tally = recordRound(tally, named, won.map((g) => g.name).filter(Boolean));
-    saveTally(localStorage, tally);
+    saveTally(storage, tally);
   }
   if (state.guesses.some((g) => !g.mine)) {
     rounds = [
@@ -259,12 +262,13 @@ reveal.addEventListener("click", () => {
         theirs: state.guesses.map((g) => !g.mine),
       },
     ];
-    saveRounds(localStorage, rounds);
+    saveRounds(storage, rounds);
     mix = fitMix(observationsOf(rounds));
   }
   reveal.hidden = true;
   next.hidden = false;
   render();
+  next.focus();
 });
 
 next.addEventListener("click", () => {
@@ -278,39 +282,54 @@ next.addEventListener("click", () => {
   name.focus();
 });
 
-$<HTMLButtonElement>("reset").addEventListener("click", () => {
-  tally = {};
-  saveTally(localStorage, tally);
+reset.addEventListener("click", () => {
+  tally = loadTally({ getItem: () => null });
+  saveTally(storage, tally);
   rounds = [];
-  saveRounds(localStorage, rounds);
+  saveRounds(storage, rounds);
   mix = fitMix([]);
   render();
+  name.focus();
 });
 
 add.addEventListener("click", addGuess);
 for (const el of [guess, name]) {
   el.addEventListener("keydown", (e) => {
-    if (e.key === "Enter") addGuess();
+    if (e.key !== "Enter") return;
+    e.preventDefault();
+    addGuess();
   });
 }
+guess.addEventListener("input", () => {
+  mineBox.checked = current !== null && Number.parseInt(guess.value, 10) === current;
+});
+// Focus moves to New round during the handler, so the default Enter action must not reach it.
 secret.addEventListener("keydown", (e) => {
-  if (e.key === "Enter") reveal.click();
+  if (e.key !== "Enter") return;
+  e.preventDefault();
+  reveal.click();
 });
 undo.addEventListener("click", () => {
+  if (revealed !== null) return;
   state.guesses.pop();
   render();
 });
-for (const el of [lo, hi]) el.addEventListener("input", render);
+for (const el of [lo, hi]) {
+  el.addEventListener("input", render);
+  el.addEventListener("change", pruneOutside);
+}
 after.addEventListener("input", () => {
-  const k = Number.parseInt(after.value, 10);
-  setAfter(Number.isFinite(k) ? k : 0);
+  if (after.value === "") return;
+  setAfter(Number.parseInt(after.value, 10));
 });
-$<HTMLButtonElement>("fewer").addEventListener("click", () => setAfter(state.after - 1));
-$<HTMLButtonElement>("more").addEventListener("click", () => setAfter(state.after + 1));
+after.addEventListener("change", () => setAfter(Number.parseInt(after.value, 10)));
+fewer.addEventListener("click", () => setAfter(state.after - 1));
+more.addEventListener("click", () => setAfter(state.after + 1));
 line.addEventListener("pointerdown", (e) => {
-  if (!readRange()) return;
+  if (revealed !== null || !parseRange(lo.value, hi.value)) return;
   const rect = line.getBoundingClientRect();
   guess.value = String(numberAt(state, rect.width, e.clientX - rect.left));
+  guess.dispatchEvent(new Event("input"));
   guess.focus();
 });
 new ResizeObserver(render).observe(line);

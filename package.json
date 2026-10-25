@@ -5,6 +5,9 @@
   "type": "module",
   "description": "Next-guess solver for the closest-number-wins game, with the odds drawn on a number line",
   "license": "MIT",
+  "engines": {
+    "node": ">=24"
+  },
   "scripts": {
     "dev": "vite",
     "build": "vite build",
