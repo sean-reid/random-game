@@ -6,7 +6,7 @@ Live at https://sean-reid.github.io/random-game/. The idea is written up at http
 
 ## How it decides
 
-Every candidate guess owns the stretch of numbers it is closest to, and the secret number is assumed to be anywhere in the range with equal chance. The tool scores each candidate by the size of its stretch, then picks the best. With nobody left to guess after you, that means hugging the neighbour on the wide side of the biggest gap. With players still to come, the tool plays them out, each taking the best remaining spot, and picks the guess that holds up.
+Every candidate guess owns the stretch of numbers it is closest to, and the secret number is assumed to be anywhere in the range with equal chance. With nobody left to guess after you, the best spot hugs the neighbour on the wide side of the biggest gap. With players still to come, the tool plays the rest of the round out a few hundred times, drawing each later player from a mix of three habits: bisect the biggest gap, guess anywhere, or hug a neighbour to take the most. It recommends the spot with the best average share and shows the share you keep in a bad round underneath. The mix starts at a stated guess and is refitted from the guesses you log at your own table, so it describes the people you actually play with rather than a survey.
 
 ## Development
 

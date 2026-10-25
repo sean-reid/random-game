@@ -203,6 +203,11 @@ footer a {
   opacity: 0.08;
 }
 
+.line-svg .area-low {
+  fill: var(--ink);
+  opacity: 0.1;
+}
+
 .line-svg .curve {
   fill: none;
   stroke: var(--ink-soft);

@@ -1,4 +1,4 @@
-import { regionOf, winEach, type Board, type Range, type Recommendation } from "../engine";
+import { regionOf, winAt, winEach, type Board, type Range, type Recommendation } from "../engine";
 import { ticks } from "./ticks";
 
 const CHAR = 7.2;
@@ -44,13 +44,19 @@ export function renderLine(
   const parts: string[] = [];
 
   if (rec.curve.length > 1) {
-    const pts = rec.curve.map((c) => `${fmt(x(c.x))},${fmt(CURVE_BASE - (c.p / pmax) * CURVE_H)}`);
     const first = rec.curve[0] as { x: number };
     const last = rec.curve[rec.curve.length - 1] as { x: number };
-    parts.push(
-      `<path class="area" d="M${fmt(x(first.x))},${CURVE_BASE}L${pts.join("L")}L${fmt(x(last.x))},${CURVE_BASE}Z"/>`,
-      `<polyline class="curve" points="${pts.join(" ")}"/>`,
-    );
+    const area = (pts: string[], cls: string) =>
+      `<path class="${cls}" d="M${fmt(x(first.x))},${CURVE_BASE}L${pts.join("L")}L${fmt(x(last.x))},${CURVE_BASE}Z"/>`;
+    const pts = rec.curve.map((c) => `${fmt(x(c.x))},${fmt(CURVE_BASE - (c.p / pmax) * CURVE_H)}`);
+    parts.push(area(pts, "area"));
+    if (rec.curve.some((c) => c.low < c.p)) {
+      const lows = rec.curve.map(
+        (c) => `${fmt(x(c.x))},${fmt(CURVE_BASE - (c.low / pmax) * CURVE_H)}`,
+      );
+      parts.push(area(lows, "area-low"));
+    }
+    parts.push(`<polyline class="curve" points="${pts.join(" ")}"/>`);
   }
 
   parts.push(
@@ -101,7 +107,8 @@ export function renderLine(
     );
     const mine = regionOf(rec.best, sorted, board);
     if (mine && mine.end >= mine.start) {
-      parts.push(bracket(x(mine.start), x(mine.end), YOU, "you", `you own ${pct(rec.bestWin)}`));
+      const now = winAt(rec.best, sorted, board);
+      parts.push(bracket(x(mine.start), x(mine.end), YOU, "you", `you own ${pct(now)} now`));
     }
   }
 

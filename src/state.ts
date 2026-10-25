@@ -1,4 +1,4 @@
-import { MAX_AFTER } from "./engine";
+import { MAX_AFTER, type Observation } from "./engine";
 import type { Guess } from "./engine/round";
 
 export interface State {
@@ -53,6 +53,60 @@ export function fromQuery(query: string): State {
     state.guesses.push({ n, name });
   }
   return state;
+}
+
+export interface RoundLog {
+  lo: number;
+  hi: number;
+  guesses: number[];
+  theirs: boolean[];
+}
+
+const ROUNDS_KEY = "random-game:rounds";
+const MAX_ROUNDS = 200;
+
+export function loadRounds(storage: Pick<Storage, "getItem">): RoundLog[] {
+  try {
+    const parsed: unknown = JSON.parse(storage.getItem(ROUNDS_KEY) ?? "[]");
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter(
+      (r: unknown): r is RoundLog =>
+        !!r &&
+        typeof r === "object" &&
+        typeof (r as RoundLog).lo === "number" &&
+        typeof (r as RoundLog).hi === "number" &&
+        Array.isArray((r as RoundLog).guesses) &&
+        Array.isArray((r as RoundLog).theirs) &&
+        (r as RoundLog).guesses.every((n) => typeof n === "number") &&
+        (r as RoundLog).theirs.length === (r as RoundLog).guesses.length,
+    );
+  } catch {
+    return [];
+  }
+}
+
+export function saveRounds(
+  storage: Pick<Storage, "setItem" | "removeItem">,
+  rounds: RoundLog[],
+): void {
+  if (rounds.length === 0) storage.removeItem(ROUNDS_KEY);
+  else storage.setItem(ROUNDS_KEY, JSON.stringify(rounds.slice(-MAX_ROUNDS)));
+}
+
+export function observationsOf(rounds: readonly RoundLog[]): Observation[] {
+  const out: Observation[] = [];
+  for (const r of rounds) {
+    for (let i = 0; i < r.guesses.length; i++) {
+      if (!r.theirs[i]) continue;
+      out.push({
+        lo: r.lo,
+        hi: r.hi,
+        before: r.guesses.slice(0, i),
+        guess: r.guesses[i] as number,
+      });
+    }
+  }
+  return out;
 }
 
 export type Tally = Record<string, { wins: number; rounds: number }>;

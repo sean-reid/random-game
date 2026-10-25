@@ -1,6 +1,7 @@
 export interface Guess {
   n: number;
   name: string;
+  mine?: boolean;
 }
 
 export function winners(guesses: readonly Guess[], secret: number): Guess[] {

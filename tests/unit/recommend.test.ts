@@ -6,6 +6,7 @@ describe("recommend", () => {
     const r = recommend({ lo: 1, hi: 100, guesses: [30] }, 0);
     expect(r.best).toBe(31);
     expect(r.bestWin).toBeCloseTo(0.7);
+    expect(r.bestLow).toBeCloseTo(0.7);
   });
 
   it("takes the centre of a flat interior gap", () => {
@@ -13,16 +14,23 @@ describe("recommend", () => {
     expect(r.best).toBe(50);
   });
 
-  it("hedges against one more player", () => {
+  it("backs away from the neighbour when players follow", () => {
     const r = recommend({ lo: 1, hi: 100, guesses: [30] }, 1);
-    expect(r.best).toBe(72);
-    expect(r.bestWin).toBeCloseTo(0.495);
+    expect(r.best).toBeGreaterThan(31);
+    expect(r.best).toBeLessThan(100);
+    expect(r.bestWin).toBeGreaterThan(0.3);
+    expect(r.bestLow).toBeLessThanOrEqual(r.bestWin);
   });
 
-  it("assumes a later player breaks ties against you", () => {
-    const r = recommend({ lo: 1, hi: 100, guesses: [30, 80] }, 1);
-    expect(r.best).toBe(25);
-    expect(r.bestWin).toBeCloseTo(0.27);
+  it("does not sit one step from a 50 with a crowd still to guess", () => {
+    const r = recommend({ lo: 1, hi: 100, guesses: [50] }, 4);
+    expect(Math.abs((r.best as number) - 50)).toBeGreaterThan(2);
+    for (const pt of r.curve) expect(pt.low).toBeLessThanOrEqual(pt.p + 1e-12);
+  });
+
+  it("is deterministic", () => {
+    const board = { lo: 1, hi: 100, guesses: [30, 80] };
+    expect(recommend(board, 3)).toEqual(recommend(board, 3));
   });
 
   it("gives a curve point for every free number on a small range", () => {
@@ -38,7 +46,7 @@ describe("recommend", () => {
 
   it("stays fast on a large range with many later players", () => {
     const start = performance.now();
-    const r = recommend({ lo: 1, hi: 100000, guesses: [500, 25000, 70000] }, 6);
+    const r = recommend({ lo: 1, hi: 100000, guesses: [500, 25000, 70000] }, 12);
     expect(r.best).not.toBeNull();
     expect(performance.now() - start).toBeLessThan(1500);
   });

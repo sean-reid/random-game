@@ -10,10 +10,12 @@ export interface Board extends Range {
 export interface CurvePoint {
   x: number;
   p: number;
+  low: number;
 }
 
 export interface Recommendation {
   best: number | null;
   bestWin: number;
+  bestLow: number;
   curve: CurvePoint[];
 }
