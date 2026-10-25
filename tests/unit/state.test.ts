@@ -1,5 +1,15 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT, fromQuery, loadTally, recordRound, saveTally, toQuery } from "../../src/state";
+import {
+  DEFAULT,
+  fromQuery,
+  loadRounds,
+  loadTally,
+  observationsOf,
+  recordRound,
+  saveRounds,
+  saveTally,
+  toQuery,
+} from "../../src/state";
 
 describe("url state", () => {
   it("leaves defaults out of the query", () => {
@@ -71,5 +81,29 @@ describe("tally", () => {
     expect(
       loadTally(fakeStorage({ "random-game:tally": '{"x":{"wins":"a","rounds":1}}' })),
     ).toEqual({});
+  });
+});
+
+describe("round log", () => {
+  it("turns each of their guesses into an observation of the board they faced", () => {
+    const rounds = [{ lo: 1, hi: 100, guesses: [50, 75, 25], theirs: [true, false, true] }];
+    expect(observationsOf(rounds)).toEqual([
+      { lo: 1, hi: 100, before: [], guess: 50 },
+      { lo: 1, hi: 100, before: [50, 75], guess: 25 },
+    ]);
+  });
+
+  it("round-trips through storage and drops malformed rounds", () => {
+    const s = fakeStorage();
+    const good = { lo: 1, hi: 10, guesses: [3, 7], theirs: [true, true] };
+    saveRounds(s, [good]);
+    expect(loadRounds(s)).toEqual([good]);
+    expect(
+      loadRounds(
+        fakeStorage({ "random-game:rounds": '[{"lo":1,"hi":10,"guesses":[3],"theirs":[]}, 5]' }),
+      ),
+    ).toEqual([]);
+    saveRounds(s, []);
+    expect(s.store.size).toBe(0);
   });
 });

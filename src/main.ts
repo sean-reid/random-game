@@ -1,12 +1,16 @@
 import "./style.css";
-import { MAX_AFTER, recommend } from "./engine";
+import { fitMix, MAX_AFTER, recommend, type Mix } from "./engine";
 import { labelOf, winners, type Guess } from "./engine/round";
 import {
   fromQuery,
+  loadRounds,
   loadTally,
+  observationsOf,
   recordRound,
+  saveRounds,
   saveTally,
   toQuery,
+  type RoundLog,
   type State,
   type Tally,
 } from "./state";
@@ -15,7 +19,10 @@ import { numberAt, renderLine } from "./ui/line";
 const app = document.getElementById("app") as HTMLElement;
 const state: State = fromQuery(location.search);
 let tally: Tally = loadTally(localStorage);
+let rounds: RoundLog[] = loadRounds(localStorage);
+let mix: Mix = fitMix(observationsOf(rounds));
 let revealed: number | null = null;
+let current: number | null = null;
 
 app.innerHTML = `
   <h1>Random Game</h1>
@@ -56,8 +63,8 @@ app.innerHTML = `
   </details>
   <details>
     <summary>How this works</summary>
-    <p>Every guess owns the numbers it is closest to, and the secret number is taken to be anywhere in the range with equal chance. The grey curve is the share of the range you would own from each spot once the players still to come have taken the best spots left, breaking ties against you. The marker is the top of that curve.</p>
-    <p>With nobody after you, the best spot hugs the neighbour on the wide side of the biggest gap. With players to come, it backs off to where squeezing you is no longer their best move.</p>
+    <p>Every guess owns the numbers it is closest to, and the secret number is taken to be anywhere in the range with equal chance. The grey curve is the share of the range you would end up with from each spot once the players still to come have guessed, averaged over a few hundred plays of the rest of the round. The darker band underneath is a bad round, the share you keep in the worst tenth of those plays. The marker is the top of the curve.</p>
+    <p id="mix"></p>
   </details>
   <footer><a href="https://github.com/sean-reid/random-game">Source</a> · <a href="https://sean-reid.github.io/blog/random-game.html">Why this works</a></footer>
 `;
@@ -151,10 +158,21 @@ function renderTally(): void {
   }
 }
 
-function playersText(): string {
-  if (state.after === 0) return "if nobody guesses after you";
-  if (state.after === 1) return "after 1 more player takes the best spot";
-  return `after ${state.after} more players take the best spots`;
+function oddsText(p: number, low: number): string {
+  const pc = (v: number) => `${Math.round(v * 100)}%`;
+  if (state.after === 0) return `${pc(p)} chance to win if nobody guesses after you.`;
+  const who = state.after === 1 ? "1 more player" : `${state.after} more players`;
+  return `${pc(p)} expected after ${who}, ${pc(low)} in a bad round.`;
+}
+
+function mixText(): string {
+  const pc = (v: number) => `${Math.round(v * 100)}%`;
+  const seen = observationsOf(rounds).length;
+  const source =
+    seen === 0
+      ? "That is a starting guess; it learns from the rounds you reveal."
+      : `Learned from ${seen} guess${seen === 1 ? "" : "es"} at your table, blended with a starting guess.`;
+  return `Each later player is drawn from a mix: ${pc(mix.middle)} go for the middle of the biggest gap, ${pc(mix.anywhere)} anywhere, ${pc(mix.hugger)} hug a neighbour to take the most. ${source}`;
 }
 
 function render(): void {
@@ -168,7 +186,9 @@ function render(): void {
     return;
   }
   const numbers = state.guesses.map((g) => g.n);
-  const r = recommend({ ...state, guesses: numbers }, state.after);
+  const r = recommend({ ...state, guesses: numbers }, state.after, mix);
+  current = r.best;
+  $<HTMLParagraphElement>("mix").textContent = mixText();
   const labels = new Map(state.guesses.filter((g) => g.name).map((g) => [g.n, g.name]));
   line.innerHTML = renderLine(
     { ...state, guesses: numbers },
@@ -185,14 +205,16 @@ function render(): void {
     return;
   }
   answer.innerHTML = `Guess <em>${r.best}</em>`;
-  odds.textContent = `${Math.round(r.bestWin * 100)}% chance to win ${playersText()}.`;
+  odds.textContent = oddsText(r.bestWin, r.bestLow);
   guess.placeholder = String(r.best);
 }
 
 function addGuess(): void {
   const n = Number.parseInt(guess.value, 10);
   if (!Number.isFinite(n) || !readRange() || n < state.lo || n > state.hi) return;
-  if (!state.guesses.some((g) => g.n === n)) state.guesses.push({ n, name: name.value.trim() });
+  if (!state.guesses.some((g) => g.n === n)) {
+    state.guesses.push({ n, name: name.value.trim(), mine: n === current });
+  }
   guess.value = "";
   name.value = "";
   name.focus();
@@ -227,6 +249,19 @@ reveal.addEventListener("click", () => {
     tally = recordRound(tally, named, won.map((g) => g.name).filter(Boolean));
     saveTally(localStorage, tally);
   }
+  if (state.guesses.some((g) => !g.mine)) {
+    rounds = [
+      ...rounds,
+      {
+        lo: state.lo,
+        hi: state.hi,
+        guesses: state.guesses.map((g) => g.n),
+        theirs: state.guesses.map((g) => !g.mine),
+      },
+    ];
+    saveRounds(localStorage, rounds);
+    mix = fitMix(observationsOf(rounds));
+  }
   reveal.hidden = true;
   next.hidden = false;
   render();
@@ -246,6 +281,9 @@ next.addEventListener("click", () => {
 $<HTMLButtonElement>("reset").addEventListener("click", () => {
   tally = {};
   saveTally(localStorage, tally);
+  rounds = [];
+  saveRounds(localStorage, rounds);
+  mix = fitMix([]);
   render();
 });
 

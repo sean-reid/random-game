@@ -11,10 +11,16 @@ describe("renderLine", () => {
     expect(svg).toContain(">25<");
     expect(svg).toContain("30 owns 28%");
     expect(svg).toContain("80 owns 46%");
-    expect(svg).toContain("you own 27%");
+    expect(svg).toContain("you own 27% now");
+    expect(svg).toContain('class="area-low"');
     expect(svg).toContain(
       'aria-label="Number line from 1 to 100 with 2 guesses; recommended guess 25',
     );
+  });
+
+  it("draws no bad-round band when nobody guesses after you", () => {
+    const svg = renderLine(board, recommend(board, 0), 960);
+    expect(svg).not.toContain('class="area-low"');
   });
 
   it("labels a stretch by name when given one", () => {

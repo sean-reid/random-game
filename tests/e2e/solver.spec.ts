@@ -14,9 +14,11 @@ test("draws the line and recommends a guess", async ({ page }, testInfo) => {
   await expect(page).toHaveURL(/\?g=30%3AAna%2C80$/);
 
   const svg = page.locator("svg.line-svg");
-  await expect(svg).toHaveAttribute("aria-label", /recommended guess 25 with a 27% chance/);
-  await expect(page.locator("#answer")).toContainText("25");
-  await expect(page.locator("#odds")).toContainText("27% chance to win after 1 more player");
+  await expect(svg).toHaveAttribute("aria-label", /recommended guess \d+ with a \d+% chance/);
+  await expect(page.locator("#answer")).toContainText(/Guess \d+/);
+  await expect(page.locator("#odds")).toContainText(
+    /\d+% expected after 1 more player, \d+% in a bad round/,
+  );
   await page.screenshot({ path: testInfo.outputPath("line.png"), fullPage: true });
 
   await page.getByRole("button", { name: "Fewer players after me" }).click();
@@ -79,6 +81,9 @@ test("reveals the winner, keeps score, and restores state from the URL", async (
   await page.reload();
   await page.locator("#board summary").click();
   await expect(page.locator("#tally tbody tr")).toHaveCount(2);
+  await page.locator("details:has(#mix) summary").click();
+  await expect(page.locator("#mix")).toContainText("Learned from 2 guesses at your table");
   await page.getByRole("button", { name: "Clear scoreboard" }).click();
   await expect(page.locator("#board")).toBeHidden();
+  await expect(page.locator("#mix")).toContainText("starting guess");
 });
