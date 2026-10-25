@@ -1,5 +1,5 @@
 import type { Range } from "./types";
-import { lowerBound, winAt } from "./win";
+import { isFree as free, winAt } from "./win";
 
 export interface Mix {
   middle: number;
@@ -13,10 +13,6 @@ export const PRIOR_WEIGHT = 6;
 export interface Observation extends Range {
   before: number[];
   guess: number;
-}
-
-function free(range: Range, sorted: readonly number[], n: number): boolean {
-  return n >= range.lo && n <= range.hi && sorted[lowerBound(sorted, n)] !== n;
 }
 
 export function hugSpots(range: Range, sorted: readonly number[]): number[] {
@@ -40,7 +36,7 @@ export function hugSpots(range: Range, sorted: readonly number[]): number[] {
   return out;
 }
 
-// The blog's rule: bisect the widest gap, measuring edge gaps from the bound itself.
+// Edge gaps measure from the bound itself; interior gaps exclude both walls.
 export function middleSpots(range: Range, sorted: readonly number[]): number[] {
   const walls = [range.lo, ...sorted, range.hi];
   const gaps: { width: number; mid: number }[] = [];

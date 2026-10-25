@@ -18,7 +18,3 @@ export function winners(guesses: readonly Guess[], secret: number): Guess[] {
   }
   return out;
 }
-
-export function labelOf(g: Guess): string {
-  return g.name.trim() || String(g.n);
-}

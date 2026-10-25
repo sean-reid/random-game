@@ -7,6 +7,7 @@ export {
   type Mix,
   type Observation,
 } from "./opponents";
-export { MAX_AFTER, recommend } from "./recommend";
+export { clampAfter, MAX_AFTER, recommend } from "./recommend";
+export { winners, type Guess } from "./round";
 export type * from "./types";
-export { regionOf, winAt, winEach } from "./win";
+export { insertSorted, regionOf, winAt, winEach } from "./win";

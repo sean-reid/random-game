@@ -15,6 +15,14 @@ export function insertSorted(sorted: number[], x: number): void {
   sorted.splice(lowerBound(sorted, x), 0, x);
 }
 
+export function has(sorted: readonly number[], x: number): boolean {
+  return sorted[lowerBound(sorted, x)] === x;
+}
+
+export function isFree(range: Range, sorted: readonly number[], n: number): boolean {
+  return n >= range.lo && n <= range.hi && !has(sorted, n);
+}
+
 export interface Region {
   start: number;
   end: number;
