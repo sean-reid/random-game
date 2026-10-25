@@ -1,3 +1,5 @@
+import type { Mix } from "./opponents";
+
 export interface Range {
   lo: number;
   hi: number;
@@ -19,4 +21,17 @@ export interface Recommendation {
   bestWin: number;
   bestLow: number;
   curve: CurvePoint[];
+}
+
+export interface RolloutRequest {
+  seq: number;
+  board: Board;
+  after: number;
+  mix: Mix;
+  prefer: number | null;
+}
+
+export interface RolloutReply {
+  seq: number;
+  result: Recommendation;
 }

@@ -15,56 +15,96 @@ export interface Observation extends Range {
   guess: number;
 }
 
-export function hugSpots(range: Range, sorted: readonly number[]): number[] {
-  const tries = new Set<number>([range.lo, range.hi]);
-  for (const g of sorted) {
-    tries.add(g - 1);
-    tries.add(g + 1);
-  }
+// The Into variants read the first len entries of sorted, write spots into out from
+// index 0, and return how many they wrote, so a rollout can reuse both arrays.
+export function hugSpotsInto(
+  range: Range,
+  sorted: readonly number[],
+  len: number,
+  out: number[],
+): number {
   let best = -1;
-  let out: number[] = [];
-  for (const n of [...tries].sort((a, b) => a - b)) {
-    if (!free(range, sorted, n)) continue;
-    const p = winAt(n, sorted, range);
+  let count = 0;
+  let last = NaN;
+  // Tries run lo, then each guess's two neighbours, then hi; the free ones come out
+  // ascending, with a repeat only ever next to its twin.
+  for (let t = 0; t <= 2 * len + 1; t++) {
+    let n: number;
+    if (t === 0) n = range.lo;
+    else if (t > 2 * len) n = range.hi;
+    else n = (sorted[(t - 1) >> 1] as number) + (t % 2 === 1 ? -1 : 1);
+    if (n === last || !free(range, sorted, n, len)) continue;
+    last = n;
+    const p = winAt(n, sorted, range, len);
     if (p > best + 1e-12) {
       best = p;
-      out = [n];
+      count = 0;
+      out[count++] = n;
     } else if (Math.abs(p - best) <= 1e-12) {
-      out.push(n);
+      out[count++] = n;
     }
   }
+  return count;
+}
+
+export function hugSpots(range: Range, sorted: readonly number[]): number[] {
+  const out: number[] = [];
+  hugSpotsInto(range, sorted, sorted.length, out);
   return out;
 }
 
 // Edge gaps measure from the bound itself; interior gaps exclude both walls.
+function gapWidth(a: number, b: number, edge: boolean): number {
+  return edge ? b - a : b - a - 1;
+}
+
+export function middleSpotsInto(
+  range: Range,
+  sorted: readonly number[],
+  len: number,
+  out: number[],
+): number {
+  let widest = 0;
+  for (let i = 0; i <= len; i++) {
+    const a = i === 0 ? range.lo : (sorted[i - 1] as number);
+    const b = i === len ? range.hi : (sorted[i] as number);
+    widest = Math.max(widest, gapWidth(a, b, i === 0 || i === len));
+  }
+  let count = 0;
+  for (let i = 0; i <= len; i++) {
+    const a = i === 0 ? range.lo : (sorted[i - 1] as number);
+    const b = i === len ? range.hi : (sorted[i] as number);
+    const width = gapWidth(a, b, i === 0 || i === len);
+    if (width <= 0 || width < widest - 1) continue;
+    const mid = (a + b) / 2;
+    const first = Number.isInteger(mid) ? mid : Math.floor(mid);
+    const spotsEnd = Number.isInteger(mid) ? mid : Math.ceil(mid);
+    for (let n = first; n <= spotsEnd; n++) {
+      if (free(range, sorted, n, len) && out[count - 1] !== n) out[count++] = n;
+    }
+  }
+  return count;
+}
+
 export function middleSpots(range: Range, sorted: readonly number[]): number[] {
-  const walls = [range.lo, ...sorted, range.hi];
-  const gaps: { width: number; mid: number }[] = [];
-  for (let i = 0; i + 1 < walls.length; i++) {
-    const a = walls[i] as number;
-    const b = walls[i + 1] as number;
-    const edge = i === 0 || i + 2 === walls.length;
-    const width = edge ? b - a : b - a - 1;
-    if (width > 0) gaps.push({ width, mid: (a + b) / 2 });
-  }
-  const widest = Math.max(0, ...gaps.map((g) => g.width));
-  const out = new Set<number>();
-  for (const g of gaps) {
-    if (g.width < widest - 1) continue;
-    const spots = Number.isInteger(g.mid) ? [g.mid] : [Math.floor(g.mid), Math.ceil(g.mid)];
-    for (const n of spots) if (free(range, sorted, n)) out.add(n);
-  }
-  return [...out].sort((a, b) => a - b);
+  const out: number[] = [];
+  middleSpotsInto(range, sorted, sorted.length, out);
+  return out;
 }
 
-export function freeCount(range: Range, sorted: readonly number[]): number {
-  return range.hi - range.lo + 1 - sorted.length;
+export function freeCount(range: Range, sorted: readonly number[], len = sorted.length): number {
+  return range.hi - range.lo + 1 - len;
 }
 
-export function nthFree(range: Range, sorted: readonly number[], index: number): number {
+export function nthFree(
+  range: Range,
+  sorted: readonly number[],
+  index: number,
+  len = sorted.length,
+): number {
   let n = range.lo + index;
-  for (const g of sorted) {
-    if (g <= n) n++;
+  for (let i = 0; i < len; i++) {
+    if ((sorted[i] as number) <= n) n++;
     else break;
   }
   return n;
