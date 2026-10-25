@@ -318,6 +318,11 @@ footer a {
   padding: 0 0 0 0.6rem;
 }
 
+.guesses li .share {
+  color: var(--ink-soft);
+  font-size: 0.875rem;
+}
+
 .guesses li.outside {
   color: var(--ink-soft);
   text-decoration: line-through;
