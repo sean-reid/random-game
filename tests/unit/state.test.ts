@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
+  cleanName,
   DEFAULT,
   fromQuery,
+  parseRange,
   loadRounds,
   loadTally,
   observationsOf,
@@ -28,6 +30,33 @@ describe("url state", () => {
     };
     expect(toQuery(s)).toBe("?lo=0&hi=50&k=3&g=30%3AAna%2C8");
     expect(fromQuery(toQuery(s))).toEqual(s);
+  });
+
+  it("keeps the mine marker and strips commas from names", () => {
+    const s = {
+      lo: 1,
+      hi: 100,
+      after: 1,
+      guesses: [
+        { n: 25, name: "", mine: true },
+        { n: 30, name: "Smith John" },
+      ],
+    };
+    expect(toQuery(s)).toBe("?g=*25%2C30%3ASmith+John");
+    expect(fromQuery(toQuery(s))).toEqual(s);
+    expect(cleanName(" Smith,  John ")).toBe("Smith John");
+    expect(fromQuery("?g=30%3ASmith%2C+John%2C40").guesses).toEqual([
+      { n: 30, name: "Smith" },
+      { n: 40, name: "" },
+    ]);
+  });
+
+  it("parses a range only when both ends are safe integers in order", () => {
+    expect(parseRange("1", "100")).toEqual({ lo: 1, hi: 100 });
+    expect(parseRange("-50", "50")).toEqual({ lo: -50, hi: 50 });
+    expect(parseRange("50", "10")).toBeNull();
+    expect(parseRange("", "10")).toBeNull();
+    expect(parseRange("1", "1e400")).toBeNull();
   });
 
   it("drops guesses outside the range, duplicates and junk", () => {
@@ -71,6 +100,12 @@ describe("tally", () => {
     });
   });
 
+  it("treats reserved property names as ordinary players", () => {
+    const t = recordRound({}, ["__proto__", "constructor", "Ana"], ["Ana"]);
+    expect(Object.keys(t).sort()).toEqual(["Ana", "__proto__", "constructor"]);
+    expect(t["constructor"]).toEqual({ wins: 0, rounds: 1 });
+  });
+
   it("survives a trip through storage and ignores garbage", () => {
     const s = fakeStorage();
     saveTally(s, { Ana: { wins: 2, rounds: 3 } });
@@ -93,11 +128,30 @@ describe("round log", () => {
     ]);
   });
 
+  it("keeps the latest 200 rounds", () => {
+    const s = fakeStorage();
+    const many = Array.from({ length: 205 }, (_, i) => ({
+      lo: 1,
+      hi: 10,
+      guesses: [i],
+      theirs: [true],
+    }));
+    saveRounds(s, many);
+    const back = loadRounds(s);
+    expect(back).toHaveLength(200);
+    expect(back[0]?.guesses).toEqual([5]);
+  });
+
   it("round-trips through storage and drops malformed rounds", () => {
     const s = fakeStorage();
     const good = { lo: 1, hi: 10, guesses: [3, 7], theirs: [true, true] };
     saveRounds(s, [good]);
     expect(loadRounds(s)).toEqual([good]);
+    expect(
+      loadRounds(
+        fakeStorage({ "random-game:rounds": '[{"lo":1,"hi":10,"guesses":[3],"theirs":[1]}]' }),
+      ),
+    ).toEqual([]);
     expect(
       loadRounds(
         fakeStorage({ "random-game:rounds": '[{"lo":1,"hi":10,"guesses":[3],"theirs":[]}, 5]' }),

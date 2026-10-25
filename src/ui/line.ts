@@ -1,28 +1,54 @@
-import { regionOf, winAt, winEach, type Board, type Range, type Recommendation } from "../engine";
+import {
+  regionOf,
+  winAt,
+  type Board,
+  type Range,
+  type Recommendation,
+  type CurvePoint,
+} from "../engine";
+import { pct } from "./copy";
 import { ticks } from "./ticks";
 
-const CHAR = 7.2;
+const CHAR_W = 7.2;
+const MIN_WIDTH = 280;
 const MARGIN = 28;
 const HEAD = 36;
 const CURVE_H = 70;
 const CURVE_BASE = HEAD + CURVE_H;
-const LINE = CURVE_BASE + 24;
-const THEM = LINE + 30;
-const YOU = THEM + 34;
-export const HEIGHT = YOU + 28;
+const Y_AXIS = CURVE_BASE + 24;
+const Y_THEM = Y_AXIS + 30;
+const Y_YOU = Y_THEM + 34;
+export const HEIGHT = Y_YOU + 28;
 
-const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;");
+const esc = (s: string) =>
+  s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 const fmt = (n: number) => n.toFixed(1);
-const pct = (p: number) => `${Math.round(p * 100)}%`;
 
-function bracket(x1: number, x2: number, y: number, cls: string, label: string): string {
+function scale(range: Range, width: number): (n: number) => number {
+  const W = Math.max(MIN_WIDTH, width);
+  return (n) => MARGIN + ((n - range.lo) / Math.max(1, range.hi - range.lo)) * (W - 2 * MARGIN);
+}
+
+function bracket(
+  x1: number,
+  x2: number,
+  y: number,
+  cls: string,
+  label: string,
+  W?: number,
+): string {
   const width = x2 - x1;
   let text = label;
-  if (width < label.length * CHAR + 8) text = label.replace(/^.*?(\S+%)\S*$/, "$1");
-  if (width < text.length * CHAR + 4) text = "";
+  if (width < label.length * CHAR_W + 8) text = /\d+%/.exec(label)?.[0] ?? "";
+  if (W === undefined && width < text.length * CHAR_W + 4) text = "";
+  let cx = (x1 + x2) / 2;
+  if (W !== undefined) {
+    const half = (text.length * CHAR_W) / 2 + 4;
+    cx = Math.min(W - half, Math.max(half, cx));
+  }
   return `<path class="${cls}" d="M${fmt(x1)},${y - 5}v5H${fmt(x2)}v-5" fill="none"/>${
     text
-      ? `<text class="${cls} lbl" x="${fmt((x1 + x2) / 2)}" y="${y + 16}" text-anchor="middle">${esc(text)}</text>`
+      ? `<text class="${cls} lbl" x="${fmt(cx)}" y="${y + 16}" text-anchor="middle">${esc(text)}</text>`
       : ""
   }`;
 }
@@ -34,18 +60,19 @@ export function renderLine(
   labels: ReadonlyMap<number, string> = new Map(),
   secret: number | null = null,
 ): string {
-  const W = Math.max(280, width);
+  const W = Math.max(MIN_WIDTH, width);
   const { lo, hi } = board;
-  const x = (n: number) => MARGIN + ((n - lo) / Math.max(1, hi - lo)) * (W - 2 * MARGIN);
+  const x = scale(board, width);
   const sorted = [...board.guesses].sort((a, b) => a - b);
-  const placed = rec.best === null ? sorted : [...sorted, rec.best].sort((a, b) => a - b);
-  const shares = winEach(placed, board);
+  const placed =
+    secret === null && rec.best !== null ? [...sorted, rec.best].sort((a, b) => a - b) : sorted;
+  const hasCurve = rec.curve.length > 1 && secret === null;
   const pmax = Math.max(0, ...rec.curve.map((c) => c.p)) || 1;
   const parts: string[] = [];
 
-  if (rec.curve.length > 1) {
-    const first = rec.curve[0] as { x: number };
-    const last = rec.curve[rec.curve.length - 1] as { x: number };
+  if (hasCurve) {
+    const first = rec.curve[0] as CurvePoint;
+    const last = rec.curve[rec.curve.length - 1] as CurvePoint;
     const area = (pts: string[], cls: string) =>
       `<path class="${cls}" d="M${fmt(x(first.x))},${CURVE_BASE}L${pts.join("L")}L${fmt(x(last.x))},${CURVE_BASE}Z"/>`;
     const pts = rec.curve.map((c) => `${fmt(x(c.x))},${fmt(CURVE_BASE - (c.p / pmax) * CURVE_H)}`);
@@ -60,62 +87,53 @@ export function renderLine(
   }
 
   parts.push(
-    `<line class="axis" x1="${MARGIN}" x2="${fmt(W - MARGIN)}" y1="${LINE}" y2="${LINE}"/>`,
+    `<line class="axis" x1="${MARGIN}" x2="${fmt(W - MARGIN)}" y1="${Y_AXIS}" y2="${Y_AXIS}"/>`,
   );
+  const tickLabel = (n: number) =>
+    `<text class="tick-lbl" x="${fmt(x(n))}" y="${Y_AXIS + 18}" text-anchor="middle">${n}</text>`;
   for (const n of ticks(lo, hi, Math.floor(W / 80))) {
     if ([lo, hi].some((e) => Math.abs(x(e) - x(n)) < 24)) continue;
     if (sorted.some((g) => Math.abs(x(g) - x(n)) < 14)) continue;
     parts.push(
-      `<line class="tick" x1="${fmt(x(n))}" x2="${fmt(x(n))}" y1="${LINE}" y2="${LINE + 5}"/>`,
-      `<text class="tick-lbl" x="${fmt(x(n))}" y="${LINE + 18}" text-anchor="middle">${n}</text>`,
+      `<line class="tick" x1="${fmt(x(n))}" x2="${fmt(x(n))}" y1="${Y_AXIS}" y2="${Y_AXIS + 5}"/>`,
+      tickLabel(n),
     );
   }
-  parts.push(
-    `<text class="tick-lbl" x="${fmt(x(lo))}" y="${LINE + 18}" text-anchor="middle">${lo}</text>`,
-    `<text class="tick-lbl" x="${fmt(x(hi))}" y="${LINE + 18}" text-anchor="middle">${hi}</text>`,
-  );
+  parts.push(tickLabel(lo), tickLabel(hi));
 
   for (const g of sorted) {
     parts.push(
-      `<line class="guess" x1="${fmt(x(g))}" x2="${fmt(x(g))}" y1="${LINE - 10}" y2="${LINE + 10}"/>`,
+      `<line class="guess" x1="${fmt(x(g))}" x2="${fmt(x(g))}" y1="${Y_AXIS - 10}" y2="${Y_AXIS + 6}"/>`,
     );
-    const r = regionOf(
-      g,
-      placed.filter((o) => o !== g),
-      board,
-    );
+    const others = placed.filter((o) => o !== g);
+    const r = regionOf(g, others, board);
     if (r && r.end >= r.start) {
+      const share = winAt(g, others, board);
       parts.push(
-        bracket(
-          x(r.start),
-          x(r.end),
-          THEM,
-          "them",
-          `${labels.get(g) ?? g} owns ${pct(shares.get(g) ?? 0)}`,
-        ),
+        bracket(x(r.start), x(r.end), Y_THEM, "them", `${labels.get(g) ?? g} owns ${pct(share)}`),
       );
     }
   }
 
-  if (rec.best !== null) {
-    const top = CURVE_BASE - (rec.bestWin / pmax) * CURVE_H;
+  if (rec.best !== null && secret === null) {
+    const top = hasCurve ? CURVE_BASE - (rec.bestWin / pmax) * CURVE_H : CURVE_BASE;
     const bx = fmt(x(rec.best));
     parts.push(
-      `<line class="you" x1="${bx}" x2="${bx}" y1="${fmt(top)}" y2="${LINE}"/>`,
+      `<line class="you" x1="${bx}" x2="${bx}" y1="${fmt(top)}" y2="${Y_AXIS}"/>`,
       `<text class="you big" x="${bx}" y="${fmt(top - 10)}" text-anchor="middle">${rec.best}</text>`,
-      `<circle class="you dot" cx="${bx}" cy="${LINE}" r="5"/>`,
+      `<circle class="you dot" cx="${bx}" cy="${Y_AXIS}" r="5"/>`,
     );
     const mine = regionOf(rec.best, sorted, board);
     if (mine && mine.end >= mine.start) {
       const now = winAt(rec.best, sorted, board);
-      parts.push(bracket(x(mine.start), x(mine.end), YOU, "you", `you own ${pct(now)} now`));
+      parts.push(bracket(x(mine.start), x(mine.end), Y_YOU, "you", `you own ${pct(now)} now`, W));
     }
   }
 
   if (secret !== null && secret >= lo && secret <= hi) {
     const sx = fmt(x(secret));
     parts.push(
-      `<line class="secret" x1="${sx}" x2="${sx}" y1="${HEAD}" y2="${LINE}"/>`,
+      `<line class="secret" x1="${sx}" x2="${sx}" y1="${HEAD}" y2="${Y_AXIS}"/>`,
       `<text class="secret-lbl" x="${sx}" y="${HEAD - 8}" text-anchor="middle">${secret}</text>`,
     );
   }
@@ -123,12 +141,16 @@ export function renderLine(
   const label =
     rec.best === null
       ? `Number line from ${lo} to ${hi}; every number is taken`
-      : `Number line from ${lo} to ${hi} with ${sorted.length} guesses; recommended guess ${rec.best} with a ${pct(rec.bestWin)} chance`;
-  return `<svg class="line-svg" width="${W}" height="${HEIGHT}" viewBox="0 0 ${W} ${HEIGHT}" role="img" aria-label="${esc(label)}">${parts.join("")}</svg>`;
+      : secret !== null
+        ? `Number line from ${lo} to ${hi} with ${sorted.length} guesses; the number was ${secret}`
+        : `Number line from ${lo} to ${hi} with ${sorted.length} guesses; recommended guess ${rec.best} with a ${pct(rec.bestWin)} chance`;
+  const lift = hasCurve || secret !== null ? 0 : CURVE_H;
+  const height = HEIGHT - lift;
+  return `<svg class="line-svg" width="${W}" height="${height}" viewBox="0 ${lift} ${W} ${height}" role="img" aria-label="${esc(label)}">${parts.join("")}</svg>`;
 }
 
-export function numberAt(board: Range, width: number, px: number): number {
-  const W = Math.max(280, width);
+export function numberAt(range: Range, width: number, px: number): number {
+  const W = Math.max(MIN_WIDTH, width);
   const t = (px - MARGIN) / (W - 2 * MARGIN);
-  return Math.round(board.lo + Math.min(1, Math.max(0, t)) * (board.hi - board.lo));
+  return Math.round(range.lo + Math.min(1, Math.max(0, t)) * (range.hi - range.lo));
 }

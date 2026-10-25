@@ -23,41 +23,46 @@ describe("renderLine", () => {
     expect(svg).not.toContain('class="area-low"');
   });
 
-  it("labels a stretch by name when given one", () => {
-    const svg = renderLine(board, rec, 960, new Map([[30, "Ana"]]));
-    expect(svg).toContain("Ana owns 28%");
-    expect(svg).toContain("80 owns 46%");
+  it("labels a stretch by name when given one, escaping markup", () => {
+    const svg = renderLine(board, rec, 960, new Map([[30, 'A<b>"na']]));
+    expect(svg).toContain("A&lt;b&gt;&quot;na owns 28%");
+    expect(svg).not.toContain("<b>");
   });
 
-  it("marks the revealed number", () => {
-    const svg = renderLine(board, rec, 960, new Map(), 33);
-    expect(svg).toContain('class="secret"');
-    expect(svg).toContain('class="secret-lbl"');
-    expect(renderLine(board, rec, 960, new Map(), 500)).not.toContain('class="secret"');
-  });
-
-  it("uses round-number ticks and keeps the ends", () => {
+  it("uses round-number ticks, keeps the ends, and steps off guesses", () => {
     const svg = renderLine(board, rec, 960);
     expect(svg).toContain(">50<");
     expect(svg).toContain(">1<");
     expect(svg).toContain(">100<");
-    expect(svg).not.toContain(">11<");
+    expect(svg).not.toContain(">30<");
+    expect(svg).not.toContain(">80<");
   });
 
-  it("drops bracket text that would not fit", () => {
+  it("shortens bracket text to the percentage before dropping it", () => {
     const tight = { lo: 1, hi: 100, guesses: [30, 31, 32] };
     const svg = renderLine(tight, recommend(tight, 0), 960);
     expect(svg).toContain("30 owns 30%");
     expect(svg).not.toContain("31 owns");
     const narrow = renderLine(board, rec, 320);
-    expect(narrow).toContain("46%");
+    expect(narrow).toContain(">28%<");
+    expect(narrow).toMatch(/class="you lbl"[^>]*>27%</);
   });
 
-  it("says when the range is full", () => {
+  it("shows the revealed number instead of the recommendation", () => {
+    const svg = renderLine(board, rec, 960, new Map(), 33);
+    expect(svg).toContain('class="secret-lbl"');
+    expect(svg).not.toContain('class="you big"');
+    expect(svg).not.toContain("you own");
+    expect(svg).toContain("the number was 33");
+    expect(renderLine(board, rec, 960, new Map(), 500)).not.toContain('class="secret"');
+  });
+
+  it("says when the range is full and drops the empty curve space", () => {
     const full = { lo: 1, hi: 2, guesses: [1, 2] };
     const svg = renderLine(full, recommend(full, 0), 400);
     expect(svg).toContain("every number is taken");
     expect(svg).not.toContain("you own");
+    expect(svg).toMatch(/viewBox="0 70 /);
   });
 });
 
