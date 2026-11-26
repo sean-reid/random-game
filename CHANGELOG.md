@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.2](https://github.com/sean-reid/random-game/compare/random-game-v0.1.1...random-game-v0.1.2) (2026-11-26)
+
+
+### Bug Fixes
+
+* link the writeup and the site at seanre.id ([#27](https://github.com/sean-reid/random-game/issues/27)) ([0539f08](https://github.com/sean-reid/random-game/commit/0539f0814bc8f97388da8ab42087e8e991d24ae1))
+
 ## [0.1.1](https://github.com/sean-reid/random-game/compare/random-game-v0.1.0...random-game-v0.1.1) (2026-10-25)
 
 
