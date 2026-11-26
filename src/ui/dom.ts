@@ -45,7 +45,7 @@ export function template(maxAfter: number, nameMax: number): string {
     <p id="mix" class="soft"></p>
     <button id="reset" type="button">Clear scoreboard and what it learned</button>
   </details>
-  <footer><a href="https://github.com/sean-reid/random-game">Source</a> · <a href="https://sean-reid.github.io/blog/random-game.html">Why this works</a></footer>
+  <footer><a href="https://github.com/sean-reid/random-game">Source</a> · <a href="https://seanre.id/blog/random-game.html">Why this works</a></footer>
 `;
 }
 

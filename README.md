@@ -2,7 +2,7 @@
 
 Someone picks a number in a range, everyone guesses, closest wins. This tool tells you what to guess next and draws why on a number line: the stretch each guess owns, how much of the range you would own from every spot, and the best one marked. Tap the line to pick a number, set how many players still guess after you, and the answer updates. Name the guessers if you like, tick "that's me" on your own guess, and enter the number when it is revealed: the winner is named, a scoreboard in this browser keeps wins and rounds per name, and the recommendation gives way to the secret on the line. The range, the guesses with their names, and the players-after count live in the URL, so a round can be shared.
 
-Live at https://sean-reid.github.io/random-game/. The idea is written up at https://sean-reid.github.io/blog/random-game.html.
+Live at https://seanre.id/random-game/. The idea is written up at https://seanre.id/blog/random-game.html.
 
 ## How it decides
 
